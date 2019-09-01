@@ -8,28 +8,35 @@ contract DaoManagement {
         address creator;
         uint yea; 
         uint nay;
-        uint32 voteDuration;
+        uint32 duration;
         uint32 finishDate;
         address proposalContractAddr;
         bytes proposalCall;
         bool executed;
+        mapping(address => bool) voteCast;
     }
     Vote[] public votes; //TODO put a maximum limit?
-
+    
+    bytes public abiX;
     constructor() public{
         Owners[msg.sender] = true;
+        abiX = abi.encodeWithSignature("addOwner(address)", 0x14723A09ACff6D2A60DcdF7aA4AFf308FDDC160C);
     }
     
     modifier onlyOwner() {
         require(Owners[msg.sender]);
         _;
     }
-    modifier ifVoteExpired(uint256 _id){
+    modifier voteExpired(uint256 _id){
         require(votes[_id].finishDate < block.timestamp);
         _;
     }
-    modifier ifVoteDidNotExpired(uint256 _id){
+    modifier voteDidNotExpired(uint256 _id){
         require(votes[_id].finishDate >= block.timestamp);
+        _;
+    }
+    modifier ownerDidNotVote(uint256 _id){
+        require(votes[_id].voteCast[msg.sender]==false);
         _;
     }
 
@@ -46,19 +53,19 @@ contract DaoManagement {
         Owners[_owner] = false;
     }
     function changeVotingSystem() public{
-        //TODO
+        
     }
 
     function createVote(
-        string memory _vote_description, uint32 _vote_duration, address _proposal_contract_address, bytes memory _proposal_call
+        string memory _description, uint32 _duration, address _proposal_contract_address, bytes memory _proposal_call
     )
-    onlyOwner public
+    public onlyOwner
     {
         //TODO only one vote per owner
-        votes.push(Vote(_vote_description, msg.sender, 0, 0, _vote_duration, uint32(block.timestamp+_vote_duration), _proposal_contract_address, _proposal_call, false));
+        votes.push(Vote(_description, msg.sender, 0, 0, _duration, uint32(block.timestamp+_duration), _proposal_contract_address, _proposal_call, false));
     }
     
-    function executeVote(uint256 _id) public ifVoteExpired(_id) returns(bool) {
+    function executeVote(uint256 _id) public onlyOwner voteExpired(_id) returns(bool) {
         bool bool_ret;
         bytes memory bytes_memory;
         votes[_id].executed = true;
@@ -69,8 +76,12 @@ contract DaoManagement {
         return bool_ret;
     }
     
-    function vote(uint256 _id, bool _choice) public ifVoteDidNotExpired(_id) {
-        //TODO check if user already voted
+    function vote(
+        uint256 _id, bool _choice
+    )
+    public onlyOwner voteDidNotExpired(_id) ownerDidNotVote(_id)
+    {
+        votes[_id].voteCast[msg.sender] = true;
         if(_choice){
             votes[_id].yea += 1;
         }
